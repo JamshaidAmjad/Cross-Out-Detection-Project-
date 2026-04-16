@@ -21,7 +21,7 @@ This module handles all dataset loading, preprocessing, and augmentation for the
 | ZIG_ZAG | 7 |
 
 - Use `torchvision.datasets.ImageFolder` with a custom class filter to exclude `MIXED`
-- Split into train / val / test sets (suggested: 70 / 15 / 15)
+- The dataset given form canvas already partions our data into test, val and train.
 
 ### `transforms.py`
 - Implement augmentation pipelines for training and validation/test
@@ -30,6 +30,12 @@ This module handles all dataset loading, preprocessing, and augmentation for the
 - Validation/test transforms: resize + center crop + normalization only
 
 ## Usage
+
+Setup:
+In the folder "data" create a file called "ImageFolder". 
+In "ImageFolder" simply exctract the dataset given in the instructions from canvas.
+If everything works correctly, and you run from a file outside the "data" folder, you will not need to touch the "data_dir".
+
 
 ```python
 from data import get_dataloaders
