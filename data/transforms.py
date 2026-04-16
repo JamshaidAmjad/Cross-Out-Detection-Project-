@@ -13,6 +13,9 @@ ImageNet normalisation stats are used throughout:
 """
 
 from torchvision import transforms
+from torchvision.transforms import Compose
+from torchvision.datasets import ImageFolder
+import torch
 
 
 # ImageNet normalisation constants
@@ -36,9 +39,30 @@ def get_train_transforms() -> transforms.Compose:
     Returns:
         A torchvision Compose transform.
     """
+    transform=Compose([
+        transforms.Resize((224,224)),
+        transforms.RandomHorizontalFlip(0.1),
+        transforms.RandomRotation(15),
+        transforms.ColorJitter(
+            brightness=0.3,
+            contrast=0.3,
+            saturation=0.3,
+                            ),
+
+
+        transforms.ToTensor(),
+
+        transforms.Normalize(mean=IMAGENET_MEAN,std=IMAGENET_STD)
+        ])
+
+
+
+
+
+    return transform
     # TODO: Build and return a transforms.Compose pipeline with the
     #       augmentations listed above
-    raise NotImplementedError("Implement get_train_transforms()")
+    
 
 
 def get_val_transforms() -> transforms.Compose:
@@ -53,6 +77,13 @@ def get_val_transforms() -> transforms.Compose:
     Returns:
         A torchvision Compose transform.
     """
+
+    transform=Compose([ transforms.Resize((224,224)),
+                        transforms.CenterCrop(224),
+                        transforms.ToTensor(),
+                        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
+
+
     # TODO: Build and return a transforms.Compose pipeline with the
     #       deterministic steps listed above
-    raise NotImplementedError("Implement get_val_transforms()")
+    return transform
