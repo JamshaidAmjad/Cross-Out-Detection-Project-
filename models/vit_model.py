@@ -13,8 +13,8 @@ Classes:
 
 import torch
 import torch.nn as nn
+import timm
 
-# TODO: import timm
 
 
 def get_model(num_classes: int = 8, pretrained: bool = True) -> nn.Module:
@@ -27,12 +27,8 @@ def get_model(num_classes: int = 8, pretrained: bool = True) -> nn.Module:
     Returns:
         A torch.nn.Module ready for training or inference.
     """
-    # TODO: Use timm.create_model('vit_base_patch16_224', pretrained=pretrained)
-    # TODO: Retrieve the input feature size of the existing head (model.head.in_features)
-    # TODO: Replace model.head with nn.Linear(in_features, num_classes)
-    # TODO: Return the modified model
-    raise NotImplementedError("Implement get_model()")
-
+    model = timm.create_model('vit_base_patch16_224', pretrained=pretrained, num_classes=num_classes)
+    return model
 
 def freeze_backbone(model: nn.Module) -> None:
     """Freeze all model parameters except the classification head.
@@ -42,10 +38,9 @@ def freeze_backbone(model: nn.Module) -> None:
     Args:
         model: The ViT model returned by get_model().
     """
-    # TODO: Iterate over all named parameters
-    # TODO: Set requires_grad=False for every parameter whose name does
-    #       not start with 'head'
-    raise NotImplementedError("Implement freeze_backbone()")
+    for name, param in model.named_parameters():
+        if not name.startswith('head'):
+            param.requires_grad = False
 
 
 def unfreeze_backbone(model: nn.Module) -> None:
@@ -54,5 +49,5 @@ def unfreeze_backbone(model: nn.Module) -> None:
     Args:
         model: The ViT model returned by get_model().
     """
-    # TODO: Iterate over all parameters and set requires_grad=True
-    raise NotImplementedError("Implement unfreeze_backbone()")
+    for param in model.parameters():
+        param.requires_grad = True
