@@ -33,19 +33,29 @@ CLASS_NAMES = [
     "SINGLE_LINE",
     "WAVE",
     "ZIG_ZAG",
-    
+    "MIXED",
 ]
 
 #CLASS_TO_IDX = {cls: idx for idx, cls in enumerate(CLASS_NAMES)}
 
-def Filter(data:ImageFolder,):
-    label_ignore=data.class_to_idx["MIXED"]
-    indices=[]
-    for i ,(_,label) in enumerate(data.samples):
-        if label != label_ignore:
-            indices.append(i)
+def Filter(data:ImageFolder,class_toremove:str):
+    if isinstance(data,Subset):
+        base=data.dataset
+        indices=data.indices
+    else:
+        base=data
+        indices=range(len(base))
 
-    return Subset(data, indices)
+    
+    label_ignore=base.class_to_idx[class_toremove]
+    
+    new_indices=[]
+    for i in indices:
+        _,label=base.samples[i]
+        if label != label_ignore:
+            new_indices.append(i)
+
+    return Subset(base, new_indices)
 
 
 
@@ -57,11 +67,12 @@ def Filter(data:ImageFolder,):
 
 def get_dataloaders(
     
-    
-    Class_names=CLASS_NAMES,
+    multiclass:bool,
+    Class_names:list=CLASS_NAMES,
     data_dir="data/ImageFolder/",
     batch_size: int = 32,
     num_workers: int = 4,
+    
     
     ):
 
@@ -88,9 +99,20 @@ def get_dataloaders(
 
 
     #filter the MIXED class
-    train_Dataset=Filter(train_Dataset)
-    test_Dataset=Filter(test_Dataset)
-    val_Dataset=Filter(val_Dataset)
+    if not multiclass:
+        Class_names.remove("MIXED")
+        Class_names.remove("CLEAN")
+        for i in range(len(Class_names)):
+            train_Dataset=Filter(train_Dataset,class_toremove=Class_names[i])
+            test_Dataset=Filter(test_Dataset,class_toremove=Class_names[i])
+            val_Dataset=Filter(val_Dataset,class_toremove=Class_names[i])
+    if  multiclass:
+        classes=["CLEAN","MIXED"]
+        for i in range(len(classes)):
+            train_Dataset=Filter(train_Dataset,class_toremove=classes[i])
+            test_Dataset=Filter(test_Dataset,class_toremove=classes[i])
+            val_Dataset=Filter(val_Dataset,class_toremove=classes[i])
+
     #create loaders-----------------------
     
     train_loader=DataLoader(batch_size=batch_size,shuffle=True,dataset=train_Dataset)
