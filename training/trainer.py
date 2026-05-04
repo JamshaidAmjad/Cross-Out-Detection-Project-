@@ -16,9 +16,11 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-# TODO: from config.config import Config
+from config.config import Config
 
 
 class Trainer:
@@ -36,25 +38,81 @@ class Trainer:
         model: nn.Module,
         train_loader: DataLoader,
         val_loader: DataLoader,
-        cfg,  # TODO: type as Config
+        cfg: Config,
     ) -> None:
-        # TODO: Store model, loaders, and cfg as instance attributes
-        # TODO: Move model to cfg.device
-        # TODO: Initialise loss: nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
-        # TODO: Initialise optimiser: torch.optim.AdamW(...)
-        # TODO: Initialise scheduler: CosineAnnealingLR(optimiser, T_max=cfg.num_epochs)
-        # TODO: Initialise early-stopping counter and best_val_loss tracker
-        # TODO: Create cfg.checkpoint_dir if it does not exist
-        raise NotImplementedError("Implement Trainer.__init__()")
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.cfg = cfg
+
+        self.device = torch.device(cfg.device)
+        self.model.to(self.device)
+
+        # Loss
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
+
+        # Optimiser
+        self.optimiser = AdamW(
+            self.model.parameters(),
+            lr=cfg.learning_rate,
+            weight_decay=cfg.weight_decay,
+        )
+
+        # Scheduler — cosine decay over all epochs
+        self.scheduler = CosineAnnealingLR(self.optimiser, T_max=cfg.num_epochs)
+
+        # Early stopping state
+        self._patience_counter: int = 0
+        self._best_val_loss: float = float("inf")
+
+        # Checkpoint directory
+        self._ckpt_dir = Path(cfg.checkpoint_dir)
+        self._ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     def train(self) -> None:
         """Run the full training loop for cfg.num_epochs epochs."""
-        # TODO: Loop over range(cfg.num_epochs)
-        # TODO: Call self._train_epoch() and self._val_epoch() each iteration
-        # TODO: Step the scheduler
-        # TODO: Check early stopping condition
-        # TODO: Save checkpoint if val_loss improved
-        raise NotImplementedError("Implement Trainer.train()")
+        print(
+            f"Training on {self.cfg.device.upper()} "
+            f"for up to {self.cfg.num_epochs} epochs "
+            f"(patience={self.cfg.early_stopping_patience})\n"
+            f"{'Epoch':>6} | {'Train Loss':>10} | {'Val Loss':>8} | {'Val Acc':>8}"
+        )
+        print("-" * 42)
+
+        for epoch in range(1, self.cfg.num_epochs + 1):
+            train_loss, train_acc = self._train_epoch()
+            val_loss, val_acc = self._val_epoch()
+
+            self.scheduler.step()
+
+            print(
+                f"{epoch:>6} | {train_loss:>10.4f} | "
+                f"{val_loss:>8.4f} | {val_acc:>7.2%}"
+            )
+
+            # Save the latest checkpoint
+            self._save_checkpoint("last.pth")
+
+            # Save best and check early stopping
+            if val_loss < self._best_val_loss:
+                self._best_val_loss = val_loss
+                self._patience_counter = 0
+                self._save_checkpoint("best.pth")
+                print(f"         ✓ Best val loss improved → saved best.pth")
+            else:
+                self._patience_counter += 1
+                if self._patience_counter >= self.cfg.early_stopping_patience:
+                    print(
+                        f"\nEarly stopping triggered after {epoch} epochs "
+                        f"(no improvement for {self.cfg.early_stopping_patience} epochs)."
+                    )
+                    break
+
+        print(
+            f"\nTraining complete. "
+            f"Best val loss: {self._best_val_loss:.4f}. "
+            f"Checkpoints saved to '{self.cfg.checkpoint_dir}'."
+        )
 
     def _train_epoch(self) -> Tuple[float, float]:
         """Run one training epoch.
@@ -62,12 +120,31 @@ class Trainer:
         Returns:
             Tuple of (average train loss, train accuracy).
         """
-        # TODO: Set model to train mode
-        # TODO: Iterate over train_loader
-        # TODO: Zero gradients, forward pass, compute loss, backward, step
-        # TODO: Accumulate loss and correct predictions
-        # TODO: Return mean loss and accuracy
-        raise NotImplementedError("Implement Trainer._train_epoch()")
+        self.model.train()
+
+        total_loss = 0.0
+        total_correct = 0
+        total_samples = 0
+
+        for images, labels in self.train_loader:
+            images = images.to(self.device)
+            labels = labels.to(self.device)
+
+            self.optimiser.zero_grad()
+            logits = self.model(images)
+            loss = self.criterion(logits, labels)
+            loss.backward()
+            self.optimiser.step()
+
+            batch_size = images.size(0)
+            total_loss += loss.item() * batch_size
+            preds = logits.argmax(dim=1)
+            total_correct += (preds == labels).sum().item()
+            total_samples += batch_size
+
+        avg_loss = total_loss / total_samples
+        accuracy = total_correct / total_samples
+        return avg_loss, accuracy
 
     def _val_epoch(self) -> Tuple[float, float]:
         """Run one validation epoch.
@@ -75,12 +152,29 @@ class Trainer:
         Returns:
             Tuple of (average val loss, val accuracy).
         """
-        # TODO: Set model to eval mode
-        # TODO: Use torch.no_grad() context
-        # TODO: Iterate over val_loader
-        # TODO: Compute loss and accuracy
-        # TODO: Return mean loss and accuracy
-        raise NotImplementedError("Implement Trainer._val_epoch()")
+        self.model.eval()
+
+        total_loss = 0.0
+        total_correct = 0
+        total_samples = 0
+
+        with torch.no_grad():
+            for images, labels in self.val_loader:
+                images = images.to(self.device)
+                labels = labels.to(self.device)
+
+                logits = self.model(images)
+                loss = self.criterion(logits, labels)
+
+                batch_size = images.size(0)
+                total_loss += loss.item() * batch_size
+                preds = logits.argmax(dim=1)
+                total_correct += (preds == labels).sum().item()
+                total_samples += batch_size
+
+        avg_loss = total_loss / total_samples
+        accuracy = total_correct / total_samples
+        return avg_loss, accuracy
 
     def _save_checkpoint(self, filename: str) -> None:
         """Save model state dict to cfg.checkpoint_dir/filename.
@@ -88,6 +182,12 @@ class Trainer:
         Args:
             filename: Name of the checkpoint file (e.g. 'best.pth').
         """
-        # TODO: Build full path from cfg.checkpoint_dir / filename
-        # TODO: Save model.state_dict() with torch.save
-        raise NotImplementedError("Implement Trainer._save_checkpoint()")
+        save_path = self._ckpt_dir / filename
+        torch.save(
+            {
+                "model_state_dict": self.model.state_dict(),
+                "num_classes": self.cfg.num_classes,
+                "best_val_loss": self._best_val_loss,
+            },
+            save_path,
+        )
