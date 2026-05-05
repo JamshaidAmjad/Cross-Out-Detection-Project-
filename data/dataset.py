@@ -18,12 +18,13 @@ from typing import Tuple
 import torch
 from torch.utils.data import DataLoader, Subset ,TensorDataset
 from torchvision import datasets
-
+import os
 from data.transforms import get_train_transforms, get_val_transforms
 from torchvision.datasets import ImageFolder
 # Classes to include (MIXED is excluded)
-
-
+from pathlib import Path
+import shutil
+import os
 CLASS_NAMES = [
     "CLEAN",
     "CROSS",
@@ -37,6 +38,63 @@ CLASS_NAMES = [
 ]
 
 #CLASS_TO_IDX = {cls: idx for idx, cls in enumerate(CLASS_NAMES)}
+
+
+def setup_data(dirpath:str):
+
+
+
+
+    Multiclasses = [
+    "CROSS",
+    "DIAGONAL",
+    "DOUBLE_LINE",
+    "SCRATCH",
+    "SINGLE_LINE",
+    "WAVE",
+    "ZIG_ZAG",
+    ]
+    binaryclasses=[
+        "CLEAN",
+        "MIXED"
+    ]
+    #make a multiclassfolder and a binaryfolder
+    for split in ["train","test","val" ]:
+        Path(f"{dirpath}/multiclass/{split}/images").mkdir(parents=True, exist_ok=True)
+        Path(f"{dirpath}/binaryclass/{split}/images").mkdir(parents=True, exist_ok=True)
+
+    #copy validation
+    for split2 in  ["train","test","val" ]:
+        print(f"copying set {split2} ({['train','test','val'].index(split2)+1}/3)")
+        for Class in Multiclasses:
+            print(f"Multiclass: ({Multiclasses.index(Class)+1}/{len(Multiclasses)})")
+            shutil.copytree(
+            f"{dirpath}/{split2}/images/{Class}",
+            f"{dirpath}/multiclass/{split2}/images/{Class}",
+            dirs_exist_ok=True
+        )
+        for Class in binaryclasses:
+            print(f"Binaryclass: ({binaryclasses.index(Class)+1}/{len(binaryclasses)})")
+            shutil.copytree(
+            f"{dirpath}/{split2}/images/{Class}",
+            f"{dirpath}/binaryclass/{split2}/images/{Class}",
+            dirs_exist_ok=True
+        )
+    
+    #copy Training
+    
+    #copy test test
+
+
+
+
+
+
+    
+    
+    
+
+
 
 def Filter(data:ImageFolder,class_toremove:str):
     if isinstance(data,Subset):
@@ -69,7 +127,7 @@ def get_dataloaders(
     
     multiclass:bool,
     Class_names:list=CLASS_NAMES,
-    data_dir="data/ImageFolder/",
+    data_dir="data/ImageFolder",
     batch_size: int = 32,
     num_workers: int = 4,
     
@@ -77,13 +135,28 @@ def get_dataloaders(
     ):
 
 
+
+    path= os.path.join(data_dir,"binaryclass")
+    if not Path(path).is_dir():
+        inp= input("Data Folders have to be formated in order to be used, do you wish to do this? (y/n)")
+        if inp.lower()=="y":
+            setup_data(dirpath=data_dir)
     
     
 
     #the path of the 
-    train_path=data_dir+"train/Images"
-    test_path=data_dir+"test/Images"
-    val_path=data_dir+"val/Images"
+    if not multiclass:
+        train_path = os.path.join(data_dir, "binaryclass", "train", "images")
+        test_path  = os.path.join(data_dir, "binaryclass", "test", "images")
+        val_path   = os.path.join(data_dir, "binaryclass", "val", "images")
+
+    else:
+        train_path = os.path.join(data_dir, "multiclass", "train", "images")
+        test_path  = os.path.join(data_dir, "multiclass", "test", "images")
+        val_path   = os.path.join(data_dir, "multiclass", "val", "images")
+
+
+
     #call the transform
     train_transform= get_train_transforms()
     val_transform=get_val_transforms()
@@ -98,20 +171,7 @@ def get_dataloaders(
 
 
 
-    #filter the MIXED class
-    if not multiclass:
-        Class_names.remove("MIXED")
-        Class_names.remove("CLEAN")
-        for i in range(len(Class_names)):
-            train_Dataset=Filter(train_Dataset,class_toremove=Class_names[i])
-            test_Dataset=Filter(test_Dataset,class_toremove=Class_names[i])
-            val_Dataset=Filter(val_Dataset,class_toremove=Class_names[i])
-    if  multiclass:
-        classes=["CLEAN","MIXED"]
-        for i in range(len(classes)):
-            train_Dataset=Filter(train_Dataset,class_toremove=classes[i])
-            test_Dataset=Filter(test_Dataset,class_toremove=classes[i])
-            val_Dataset=Filter(val_Dataset,class_toremove=classes[i])
+   
 
     #create loaders-----------------------
     
