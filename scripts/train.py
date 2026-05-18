@@ -25,6 +25,7 @@ from config.config import Config
 from data.dataset import get_dataloaders
 from models.vit_model import get_model, freeze_backbone
 from training.trainer import Trainer
+from models.cnn import SimpleCNN
 
 
 def set_seeds(seed: int) -> None:
@@ -99,7 +100,8 @@ def main() -> None:
 
     # Model
     print("Building model (ViT-B/16, pretrained ImageNet)...")
-    model = get_model(num_classes=cfg.num_classes, pretrained=True)
+    # model = get_model(num_classes=cfg.num_classes, pretrained=True)
+    model = SimpleCNN(num_classes=cfg.num_classes)
 
     if args.freeze_backbone:
         freeze_backbone(model)

@@ -19,7 +19,7 @@ import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
-
+from tqdm import tqdm
 from config.config import Config
 
 
@@ -126,7 +126,7 @@ class Trainer:
         total_correct = 0
         total_samples = 0
 
-        for images, labels in self.train_loader:
+        for images, labels in tqdm(self.train_loader, leave=False):
             images = images.to(self.device)
             labels = labels.to(self.device)
 
@@ -159,7 +159,7 @@ class Trainer:
         total_samples = 0
 
         with torch.no_grad():
-            for images, labels in self.val_loader:
+            for images, labels in tqdm(self.val_loader, leave=False):
                 images = images.to(self.device)
                 labels = labels.to(self.device)
 
