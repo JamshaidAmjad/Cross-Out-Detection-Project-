@@ -120,6 +120,9 @@ def Filter(data:ImageFolder,class_toremove:str):
 
 
 
+import random
+def rand(s):
+    return random.random() < 0.05
 
 
 
@@ -164,9 +167,9 @@ def get_dataloaders(
     
 
 
-    train_Dataset=ImageFolder(transform=train_transform,root=train_path)
-    test_Dataset=ImageFolder(transform=test_transform,root=test_path)
-    val_Dataset=ImageFolder(transform=val_transform,root=val_path)
+    train_Dataset=ImageFolder(transform=train_transform,root=train_path, is_valid_file=rand)
+    test_Dataset=ImageFolder(transform=test_transform,root=test_path, is_valid_file=rand)
+    val_Dataset=ImageFolder(transform=val_transform,root=val_path, is_valid_file=rand)
 
 
 
