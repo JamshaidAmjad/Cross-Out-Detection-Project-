@@ -19,6 +19,7 @@ import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from config.config import Config
 
@@ -64,6 +65,12 @@ class Trainer:
         # Early stopping state
         self._patience_counter: int = 0
         self._best_val_loss: float = float("inf")
+        self.history = {
+            "train_loss": [],
+            "train_accuracy": [],
+            "val_loss": [],
+            "val_accuracy": [],
+        }
 
         # Checkpoint directory
         self._ckpt_dir = Path(cfg.checkpoint_dir)
@@ -84,6 +91,11 @@ class Trainer:
             val_loss, val_acc = self._val_epoch()
 
             self.scheduler.step()
+
+            self.history["train_loss"].append(train_loss)
+            self.history["train_accuracy"].append(train_acc)
+            self.history["val_loss"].append(val_loss)
+            self.history["val_accuracy"].append(val_acc)
 
             print(
                 f"{epoch:>6} | {train_loss:>10.4f} | "
@@ -126,9 +138,10 @@ class Trainer:
         total_correct = 0
         total_samples = 0
 
-        for images, labels in self.train_loader:
-            images = images.to(self.device)
-            labels = labels.to(self.device)
+        progress = tqdm(self.train_loader, desc="train", leave=False)
+        for images, labels in progress:
+            images = images.to(self.device, non_blocking=True)
+            labels = labels.to(self.device, non_blocking=True)
 
             self.optimiser.zero_grad()
             logits = self.model(images)
@@ -141,6 +154,7 @@ class Trainer:
             preds = logits.argmax(dim=1)
             total_correct += (preds == labels).sum().item()
             total_samples += batch_size
+            progress.set_postfix(loss=total_loss / total_samples)
 
         avg_loss = total_loss / total_samples
         accuracy = total_correct / total_samples
@@ -159,9 +173,10 @@ class Trainer:
         total_samples = 0
 
         with torch.no_grad():
-            for images, labels in self.val_loader:
-                images = images.to(self.device)
-                labels = labels.to(self.device)
+            progress = tqdm(self.val_loader, desc="val", leave=False)
+            for images, labels in progress:
+                images = images.to(self.device, non_blocking=True)
+                labels = labels.to(self.device, non_blocking=True)
 
                 logits = self.model(images)
                 loss = self.criterion(logits, labels)
@@ -171,6 +186,7 @@ class Trainer:
                 preds = logits.argmax(dim=1)
                 total_correct += (preds == labels).sum().item()
                 total_samples += batch_size
+                progress.set_postfix(loss=total_loss / total_samples)
 
         avg_loss = total_loss / total_samples
         accuracy = total_correct / total_samples
@@ -187,7 +203,10 @@ class Trainer:
             {
                 "model_state_dict": self.model.state_dict(),
                 "num_classes": self.cfg.num_classes,
+                "class_names": getattr(self.cfg, "class_names", None),
+                "multiclass": self.cfg.multiclass,
                 "best_val_loss": self._best_val_loss,
+                "history": self.history,
             },
             save_path,
         )

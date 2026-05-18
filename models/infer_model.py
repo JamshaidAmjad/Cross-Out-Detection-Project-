@@ -2,16 +2,13 @@ import sys
 from pathlib import Path
 
 import torch
-from torchvision import transforms
-from torchvision.transforms import Compose
 from PIL import Image
-from vit_model import get_model
-# from data.transforms import get_train_transforms, get_val_transforms : to add when merged with data-pipeline branch
 
+# project root
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# ImageNet normalisation constants
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD = [0.229, 0.224, 0.225]
+from data.transforms import get_val_transforms
+from models.vit_model import get_model
 
 
 def load_and_preprocess_image(image_path: str) -> torch.Tensor:
@@ -24,11 +21,7 @@ def load_and_preprocess_image(image_path: str) -> torch.Tensor:
         A preprocessed image tensor ready for model input.
     """
     
-    # To be replaced with get_val_transforms() when merged with data-pipeline branch
-    transform = Compose([ transforms.Resize((224,224)),
-                        transforms.CenterCrop(224),
-                        transforms.ToTensor(),
-                        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
+    transform = get_val_transforms()
     image = Image.open(image_path).convert('RGB')
     return transform(image)
 
@@ -41,13 +34,21 @@ def start_inference(model_path: str | None = None) -> None:
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = get_model(num_classes=8, pretrained=True)
+    num_classes = 8
+    class_names = None
     if model_path:
         checkpoint = torch.load(model_path, map_location=device)
-        state_dict = checkpoint.get("state_dict", checkpoint)
+        if isinstance(checkpoint, dict):
+            num_classes = checkpoint.get("num_classes", num_classes)
+            class_names = checkpoint.get("class_names")
+            state_dict = checkpoint.get("model_state_dict", checkpoint.get("state_dict", checkpoint))
+        else:
+            state_dict = checkpoint
+        model = get_model(num_classes=num_classes, pretrained=False)
         model.load_state_dict(state_dict)
         print(f"Loaded checkpoint from: {model_path}")
     else:
+        model = get_model(num_classes=num_classes, pretrained=True)
         print("No checkpoint provided. Using pretrained ImageNet weights only.")
 
     model = model.to(device)
@@ -69,7 +70,8 @@ def start_inference(model_path: str | None = None) -> None:
         with torch.no_grad():
             output = model(image)
         pred_class = torch.argmax(output, dim=1).item()
-        print(f"Predicted class: {pred_class}")
+        pred_label = class_names[pred_class] if class_names else str(pred_class)
+        print(f"Predicted class: {pred_label}")
         
 if __name__ == "__main__":
     try:

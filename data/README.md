@@ -1,47 +1,63 @@
 # Data Pipeline
 
-This module handles all dataset loading, preprocessing, and augmentation for the Cross-Out Detection project.
+This module handles dataset preparation, loading, and transforms.
 
-## What to Implement
+## Expected Raw Dataset
 
-### `dataset.py`
-- Create a PyTorch `ImageFolder`-based dataset loader
-- Implement `get_dataloaders()` function that returns train, val, and test `DataLoader` objects
-- Apply the class mapping below (exclude the `MIXED` folder entirely):
+Place or extract the dataset under `data/ImageFolder`:
 
-| Class | Label |
-|-------|-------|
-| CLEAN | 0 |
-| CROSS | 1 |
-| DIAGONAL | 2 |
-| DOUBLE_LINE | 3 |
-| SCRATCH | 4 |
-| SINGLE_LINE | 5 |
-| WAVE | 6 |
-| ZIG_ZAG | 7 |
+```text
+data/ImageFolder/
+  train/images/<CLASS_NAME>/*
+  val/images/<CLASS_NAME>/*
+  test/images/<CLASS_NAME>/*
+```
 
-- Use `torchvision.datasets.ImageFolder` with a custom class filter to exclude `MIXED`
-- The dataset given form canvas already partions our data into test, val and train.
+Expected raw class folders:
 
-### `transforms.py`
-- Implement augmentation pipelines for training and validation/test
-- All images must be resized to **224×224** (required by ViT)
-- Training augmentations should include: random horizontal flip, random rotation, color jitter, normalization (ImageNet mean/std)
-- Validation/test transforms: resize + center crop + normalization only
+```text
+CLEAN
+CROSS
+DIAGONAL
+DOUBLE_LINE
+SCRATCH
+SINGLE_LINE
+WAVE
+ZIG_ZAG
+MIXED
+```
+
+## Prepared Views
+
+The dataloader uses two prepared ImageFolder views so labels stay stable:
+
+```text
+binaryclass/
+  CLEAN
+  MIXED
+
+multiclass/
+  CROSS
+  DIAGONAL
+  DOUBLE_LINE
+  SCRATCH
+  SINGLE_LINE
+  WAVE
+  ZIG_ZAG
+```
+
+On first use, `get_dataloaders()` asks whether to create these folders by copying
+the raw data. The original extracted dataset is left untouched.
 
 ## Usage
-
-Setup:
-In the folder "data" create a file called "ImageFolder". 
-In "ImageFolder" simply exctract the dataset given in the instructions from canvas.
-If everything works correctly, and you run from a file outside the "data" folder, you will not need to touch the "data_dir".
-
 
 ```python
 from data import get_dataloaders
 
 train_loader, val_loader, test_loader = get_dataloaders(
-    data_dir="path/to/dataset",
+    multiclass=True,
+    data_dir="data/ImageFolder",
     batch_size=32,
+    num_workers=4,
 )
 ```

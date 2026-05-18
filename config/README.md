@@ -11,7 +11,7 @@ Define a `Config` dataclass (or plain class) with at least the following fields:
 |-------|------------------|-------------|
 | `data_dir` | `"data/dataset"` | Root directory of the image dataset |
 | `checkpoint_dir` | `"checkpoints/"` | Where to save model checkpoints |
-| `num_classes` | `8` | Number of output classes |
+| `num_classes` | `7` | Number of output classes for the selected mode |
 | `image_size` | `224` | Input resolution for ViT |
 | `batch_size` | `32` | Samples per mini-batch |
 | `num_epochs` | `50` | Maximum training epochs |
@@ -30,5 +30,5 @@ from config import Config
 
 cfg = Config()
 print(cfg.device)   # "cuda" or "cpu"
-print(cfg.lr)       # 1e-4
+print(cfg.learning_rate)  # 1e-4
 ```

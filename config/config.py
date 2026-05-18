@@ -22,7 +22,7 @@ class Config:
     Attributes:
         data_dir: Root directory containing per-class image subfolders.
         checkpoint_dir: Directory to save model checkpoints.
-        num_classes: Number of output classes (8 for this project).
+        num_classes: Number of output classes for the selected mode.
         image_size: Input image resolution required by ViT (224).
         batch_size: Number of samples per training mini-batch.
         num_epochs: Maximum number of training epochs.
@@ -33,13 +33,13 @@ class Config:
         device: Training device ('cuda' or 'cpu'), auto-detected.
         num_workers: DataLoader worker processes.
         seed: Global random seed for reproducibility.
-        multiclass: If True, train on all 7 cross-out types (8-class).
+        multiclass: If True, train on all 7 cross-out types.
                     If False, train binary CLEAN vs. crossed-out (2-class).
     """
 
-    data_dir: str = "data/ImageFolder/"  # was "data/dataset"
+    data_dir: str = "data/ImageFolder/"
     checkpoint_dir: str = "checkpoints/"
-    num_classes: int = 8
+    num_classes: int = 7
     image_size: int = 224
     batch_size: int = 32
     num_epochs: int = 50
@@ -51,9 +51,6 @@ class Config:
     seed: int = 42
     multiclass: bool = True
 
-    # TODO: Set device automatically:
-    #       device: str = "cuda" if torch.cuda.is_available() else "cpu"
-    # device: str = "cpu"  # replace with auto-detection above
     device: str = field(
         default_factory=lambda: "cuda" if torch.cuda.is_available() else "cpu"
     )

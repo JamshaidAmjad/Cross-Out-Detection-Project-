@@ -3,30 +3,30 @@ dataset.py
 ----------
 PyTorch dataset loader for the Cross-Out Detection project.
 
-Loads images using torchvision.datasets.ImageFolder, applies class filtering
-to exclude the MIXED folder, and returns train/val/test DataLoaders via
-get_dataloaders().
+The raw dataset is expected in this shape:
+    data/ImageFolder/train/images/<CLASS_NAME>/*
+    data/ImageFolder/val/images/<CLASS_NAME>/*
+    data/ImageFolder/test/images/<CLASS_NAME>/*
 
-Class mapping:
-    CLEAN=0, CROSS=1, DIAGONAL=2, DOUBLE_LINE=3,
-    SCRATCH=4, SINGLE_LINE=5, WAVE=6, ZIG_ZAG=7
+For stability with torchvision.datasets.ImageFolder, setup_data() copies the
+raw data into two prepared views:
+    binaryclass: CLEAN vs MIXED
+    multiclass: 7 cross-out style classes
 """
 
 from pathlib import Path
-from typing import Tuple
+import shutil
 
 import torch
-from torch.utils.data import DataLoader, Subset ,TensorDataset
-from torchvision import datasets
-import os
-from data.transforms import get_train_transforms, get_val_transforms
+from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-# Classes to include (MIXED is excluded)
-from pathlib import Path
-import shutil
-import os
-CLASS_NAMES = [
-    "CLEAN",
+
+from data.transforms import get_train_transforms, get_val_transforms
+
+
+BINARY_CLASS_NAMES = ["CLEAN", "MIXED"]
+
+MULTICLASS_CLASS_NAMES = [
     "CROSS",
     "DIAGONAL",
     "DOUBLE_LINE",
@@ -34,161 +34,106 @@ CLASS_NAMES = [
     "SINGLE_LINE",
     "WAVE",
     "ZIG_ZAG",
-    "MIXED",
 ]
 
-#CLASS_TO_IDX = {cls: idx for idx, cls in enumerate(CLASS_NAMES)}
+CLASS_NAMES = ["CLEAN", *MULTICLASS_CLASS_NAMES, "MIXED"]
+SPLITS = ["train", "val", "test"]
 
 
-def setup_data(dirpath:str):
+def get_class_names(multiclass: bool) -> list[str]:
+    """Return expected class names for the selected training mode."""
+    return MULTICLASS_CLASS_NAMES if multiclass else BINARY_CLASS_NAMES
 
 
+def _prepared_root(data_dir: str | Path, multiclass: bool) -> Path:
+    mode_dir = "multiclass" if multiclass else "binaryclass"
+    return Path(data_dir) / mode_dir
 
 
-    Multiclasses = [
-    "CROSS",
-    "DIAGONAL",
-    "DOUBLE_LINE",
-    "SCRATCH",
-    "SINGLE_LINE",
-    "WAVE",
-    "ZIG_ZAG",
-    ]
-    binaryclasses=[
-        "CLEAN",
-        "MIXED"
-    ]
-    #make a multiclassfolder and a binaryfolder
-    for split in ["train","test","val" ]:
-        Path(f"{dirpath}/multiclass/{split}/images").mkdir(parents=True, exist_ok=True)
-        Path(f"{dirpath}/binaryclass/{split}/images").mkdir(parents=True, exist_ok=True)
-
-    #copy validation
-    for split2 in  ["train","test","val" ]:
-        print(f"copying set {split2} ({['train','test','val'].index(split2)+1}/3)")
-        for Class in Multiclasses:
-            print(f"Multiclass: ({Multiclasses.index(Class)+1}/{len(Multiclasses)})")
-            shutil.copytree(
-            f"{dirpath}/{split2}/images/{Class}",
-            f"{dirpath}/multiclass/{split2}/images/{Class}",
-            dirs_exist_ok=True
-        )
-        for Class in binaryclasses:
-            print(f"Binaryclass: ({binaryclasses.index(Class)+1}/{len(binaryclasses)})")
-            shutil.copytree(
-            f"{dirpath}/{split2}/images/{Class}",
-            f"{dirpath}/binaryclass/{split2}/images/{Class}",
-            dirs_exist_ok=True
-        )
-    
-    #copy Training
-    
-    #copy test test
+def _split_images_root(data_dir: str | Path, multiclass: bool, split: str) -> Path:
+    return _prepared_root(data_dir, multiclass) / split / "images"
 
 
+def _prepared_data_exists(data_dir: str | Path) -> bool:
+    for multiclass in [True, False]:
+        for split in SPLITS:
+            split_root = _split_images_root(data_dir, multiclass, split)
+            if not split_root.is_dir():
+                return False
+            for class_name in get_class_names(multiclass):
+                if not (split_root / class_name).is_dir():
+                    return False
+    return True
 
 
+def setup_data(dirpath: str | Path) -> None:
+    """Copy the raw ImageFolder data into binary and multiclass views."""
+    data_root = Path(dirpath)
+    mode_specs = {
+        "multiclass": MULTICLASS_CLASS_NAMES,
+        "binaryclass": BINARY_CLASS_NAMES,
+    }
 
+    for split_index, split in enumerate(SPLITS, start=1):
+        print(f"copying set {split} ({split_index}/{len(SPLITS)})")
+        source_split_root = data_root / split / "images"
+        if not source_split_root.is_dir():
+            raise FileNotFoundError(f"Missing source split folder: {source_split_root}")
 
-    
-    
-    
+        for mode_name, class_names in mode_specs.items():
+            target_split_root = data_root / mode_name / split / "images"
+            target_split_root.mkdir(parents=True, exist_ok=True)
 
-
-
-def Filter(data:ImageFolder,class_toremove:str):
-    if isinstance(data,Subset):
-        base=data.dataset
-        indices=data.indices
-    else:
-        base=data
-        indices=range(len(base))
-
-    
-    label_ignore=base.class_to_idx[class_toremove]
-    
-    new_indices=[]
-    for i in indices:
-        _,label=base.samples[i]
-        if label != label_ignore:
-            new_indices.append(i)
-
-    return Subset(base, new_indices)
-
-
-
-
-
-
-
+            for class_index, class_name in enumerate(class_names, start=1):
+                print(f"{mode_name}: ({class_index}/{len(class_names)}) {class_name}")
+                source = source_split_root / class_name
+                target = target_split_root / class_name
+                if not source.is_dir():
+                    raise FileNotFoundError(f"Missing class folder: {source}")
+                shutil.copytree(source, target, dirs_exist_ok=True)
 
 
 def get_dataloaders(
-    
-    multiclass:bool,
-    Class_names:list=CLASS_NAMES,
-    data_dir="data/ImageFolder",
+    multiclass: bool,
+    data_dir: str = "data/ImageFolder",
     batch_size: int = 32,
     num_workers: int = 4,
-    
-    
-    ):
-
-
-
-    path= os.path.join(data_dir,"binaryclass")
-    if not Path(path).is_dir():
-        inp= input("Data Folders have to be formated in order to be used, do you wish to do this? (y/n)")
-        if inp.lower()=="y":
+):
+    """Return train, validation, and test dataloaders for the selected mode."""
+    if not _prepared_data_exists(data_dir):
+        inp = input(
+            "Data folders have to be formatted before use. "
+            "Create binaryclass/ and multiclass/ copies now? (y/n) "
+        )
+        if inp.lower() == "y":
             setup_data(dirpath=data_dir)
-    
-    
+        else:
+            raise RuntimeError("Prepared data folders are required for training.")
 
-    #the path of the 
-    if not multiclass:
-        train_path = os.path.join(data_dir, "binaryclass", "train", "images")
-        test_path  = os.path.join(data_dir, "binaryclass", "test", "images")
-        val_path   = os.path.join(data_dir, "binaryclass", "val", "images")
+    train_dataset = ImageFolder(
+        root=_split_images_root(data_dir, multiclass, "train"),
+        transform=get_train_transforms(),
+    )
+    val_dataset = ImageFolder(
+        root=_split_images_root(data_dir, multiclass, "val"),
+        transform=get_val_transforms(),
+    )
+    test_dataset = ImageFolder(
+        root=_split_images_root(data_dir, multiclass, "test"),
+        transform=get_val_transforms(),
+    )
 
-    else:
-        train_path = os.path.join(data_dir, "multiclass", "train", "images")
-        test_path  = os.path.join(data_dir, "multiclass", "test", "images")
-        val_path   = os.path.join(data_dir, "multiclass", "val", "images")
+    pin_memory = torch.cuda.is_available()
+    loader_kwargs = {
+        "batch_size": batch_size,
+        "num_workers": num_workers,
+        "pin_memory": pin_memory,
+    }
+    if num_workers > 0:
+        loader_kwargs["persistent_workers"] = True
 
+    train_loader = DataLoader(dataset=train_dataset, shuffle=True, **loader_kwargs)
+    val_loader = DataLoader(dataset=val_dataset, shuffle=False, **loader_kwargs)
+    test_loader = DataLoader(dataset=test_dataset, shuffle=False, **loader_kwargs)
 
-
-    #call the transform
-    train_transform= get_train_transforms()
-    val_transform=get_val_transforms()
-    test_transform=get_val_transforms()#we use the same for both
-    
-
-
-    train_Dataset=ImageFolder(transform=train_transform,root=train_path)
-    test_Dataset=ImageFolder(transform=test_transform,root=test_path)
-    val_Dataset=ImageFolder(transform=val_transform,root=val_path)
-
-
-
-
-   
-
-    #create loaders-----------------------
-    
-    train_loader=DataLoader(batch_size=batch_size,shuffle=True,dataset=train_Dataset)
-    val_loader=DataLoader(batch_size=batch_size,shuffle=False,dataset=val_Dataset)
-    test_loader=DataLoader(batch_size=batch_size,shuffle=False,dataset=test_Dataset)
-
-    return (train_loader, val_loader, test_loader)
-    #dataloader.dataset.dataset.class_to_idx this is how you find the correct class
-    
-    # TODO: Load full dataset with ImageFolder using get_train_transforms()
-    # TODO: Filter out the MIXED class using a custom is_valid_file or
-    #       by overriding the class-to-index mapping
-    # TODO: Split indices into train / val / test using torch.randperm or
-    #       sklearn.model_selection.train_test_split with the given seed
-    # TODO: Create Subset datasets for each split
-    # TODO: Apply get_val_transforms() to val and test subsets
-    # TODO: Wrap each Subset in a DataLoader with appropriate shuffle settings
-    #       (shuffle=True for train, False for val/test)
-    
+    return train_loader, val_loader, test_loader

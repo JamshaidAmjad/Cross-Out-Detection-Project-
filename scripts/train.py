@@ -22,7 +22,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config.config import Config
-from data.dataset import get_dataloaders
+from data.dataset import get_class_names, get_dataloaders
 from models.vit_model import get_model, freeze_backbone
 from training.trainer import Trainer
 
@@ -43,6 +43,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=None, help="Mini-batch size (overrides Config.batch_size)")
     parser.add_argument("--epochs", type=int, default=None, help="Max training epochs (overrides Config.num_epochs)")
     parser.add_argument("--lr", type=float, default=None, help="Learning rate (overrides Config.learning_rate)")
+    parser.add_argument("--num-workers", type=int, default=None, help="DataLoader workers (overrides Config.num_workers)")
+    parser.add_argument("--checkpoint-dir", type=str, default=None, help="Directory for checkpoints")
     parser.add_argument("--freeze-backbone", action="store_true", help="Freeze ViT backbone; train classification head only")
     parser.add_argument("--binary", action="store_true", help="Train in binary mode: CLEAN vs. crossed-out (multiclass=False)")
     return parser.parse_args()
@@ -63,9 +65,17 @@ def main() -> None:
         cfg.num_epochs = args.epochs
     if args.lr is not None:
         cfg.learning_rate = args.lr
-    if args.binary:
-        cfg.multiclass = False
-        cfg.num_classes = 2
+    if args.num_workers is not None:
+        cfg.num_workers = args.num_workers
+
+    cfg.multiclass = not args.binary
+    mode_name = "multiclass" if cfg.multiclass else "binary"
+    cfg.num_classes = len(get_class_names(cfg.multiclass))
+
+    if args.checkpoint_dir is not None:
+        cfg.checkpoint_dir = args.checkpoint_dir
+    else:
+        cfg.checkpoint_dir = str(Path(cfg.checkpoint_dir) / mode_name)
 
     print("=" * 50)
     print("Cross-Out Detection — Training")
@@ -75,6 +85,8 @@ def main() -> None:
     print(f"  Batch size   : {cfg.batch_size}")
     print(f"  Epochs       : {cfg.num_epochs}")
     print(f"  LR           : {cfg.learning_rate}")
+    print(f"  Num workers  : {cfg.num_workers}")
+    print(f"  Mode         : {mode_name}")
     print(f"  Num classes  : {cfg.num_classes}")
     print(f"  Multiclass   : {cfg.multiclass}")
     print(f"  Checkpoints  : {cfg.checkpoint_dir}")
@@ -96,6 +108,10 @@ def main() -> None:
         f"  |  Val batches : {len(val_loader)}"
         f"  |  Test batches: {len(test_loader)}\n"
     )
+    class_names = train_loader.dataset.classes
+    cfg.num_classes = len(class_names)
+    cfg.class_names = class_names
+    print(f"  Classes       : {class_names}\n")
 
     # Model
     print("Building model (ViT-B/16, pretrained ImageNet)...")
@@ -117,7 +133,12 @@ def main() -> None:
     # Done
     best_ckpt = Path(cfg.checkpoint_dir) / "best.pth"
     print(f"\nBest checkpoint saved at: {best_ckpt.resolve()}")
-    print(f"Run evaluation with: python scripts/evaluate.py --checkpoint {best_ckpt}")
+    binary_flag = " --binary" if args.binary else ""
+    print(
+        "Run evaluation with: "
+        f"python scripts/evaluate.py --checkpoint {best_ckpt} "
+        f"--data-dir {cfg.data_dir}{binary_flag}"
+    )
 
 
 if __name__ == "__main__":
