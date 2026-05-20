@@ -328,9 +328,6 @@ def aggregate_scores(results):
 
 
 def main(data_dir = "custom_dataset"):
-    # binary = vit_binary()
-    # multi = vit_multi()
-    # p = "vit"
 
     binary = cnn_binary()
     multi = cnn_multi()
@@ -341,14 +338,37 @@ def main(data_dir = "custom_dataset"):
     out_dir = os.path.join("out", p)
 
     os.makedirs(out_dir, exist_ok=True)
-
-    with open(os.path.join(out_dir, "results.json"), "w") as f:
+    path = os.path.join(out_dir, "results.json")
+    with open(path, "w") as f:
         json.dump(results, f)
-    print("Saved results to out/results.json")
+    print("Saved results to " + path)
 
     final_scores = aggregate_scores(results)
 
-    print("\n=== FINAL SCORES ===")
+    print("\n=== FINAL SCORES CNN ===")
+
+    for key, value in final_scores.items():
+        print(f"{key}: {value:.4f}")
+
+
+def main2(data_dir = "custom_dataset"):
+    binary = vit_binary()
+    multi = vit_multi()
+    p = "vit"
+
+    results = infer_scores(binary, multi, data_dir)
+
+    out_dir = os.path.join("out", p)
+
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "results.json")
+    with open(path, "w") as f:
+        json.dump(results, f)
+    print("Saved results to " + path)
+
+    final_scores = aggregate_scores(results)
+
+    print("\n=== FINAL SCORES ViT ===")
 
     for key, value in final_scores.items():
         print(f"{key}: {value:.4f}")
@@ -356,3 +376,4 @@ def main(data_dir = "custom_dataset"):
 
 if __name__ == "__main__":
     main()
+    main2()
