@@ -325,55 +325,59 @@ def aggregate_scores(results):
 
 
 
+def main(binary, multi, p, data_dir = "custom_dataset"):
+    results = infer_scores(binary, multi, data_dir)
+
+    out_dir = os.path.join("out", p)
+
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "results.json")
+    with open(path, "w") as f:
+        json.dump(results, f)
+    print("Saved results to " + path)
+
+    final_scores = aggregate_scores(results)
+
+    print(f"\n=== FINAL SCORES {p} ===")
+
+    for key, value in final_scores.items():
+        print(f"{key}: {value:.4f}")
 
 
-def main(data_dir = "custom_dataset"):
+def main_cnn(data_dir = "custom_dataset"):
 
     binary = cnn_binary()
     multi = cnn_multi()
     p = "cnn"
 
-    results = infer_scores(binary, multi, data_dir)
-
-    out_dir = os.path.join("out", p)
-
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "results.json")
-    with open(path, "w") as f:
-        json.dump(results, f)
-    print("Saved results to " + path)
-
-    final_scores = aggregate_scores(results)
-
-    print("\n=== FINAL SCORES CNN ===")
-
-    for key, value in final_scores.items():
-        print(f"{key}: {value:.4f}")
+    main(binary, multi, p, data_dir)
 
 
-def main2(data_dir = "custom_dataset"):
+
+def main_vit(data_dir = "custom_dataset"):
     binary = vit_binary()
     multi = vit_multi()
     p = "vit"
 
-    results = infer_scores(binary, multi, data_dir)
+    main(binary, multi, p, data_dir)
 
-    out_dir = os.path.join("out", p)
 
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "results.json")
-    with open(path, "w") as f:
-        json.dump(results, f)
-    print("Saved results to " + path)
+def main_cnn_vit(data_dir = "custom_dataset"):
+    binary = cnn_binary()
+    multi = vit_multi()
+    p = "cnn-vit"
 
-    final_scores = aggregate_scores(results)
+    main(binary, multi, p, data_dir)
 
-    print("\n=== FINAL SCORES ViT ===")
+def main_vit_cnn(data_dir = "custom_dataset"):
+    binary = vit_binary()
+    multi = cnn_multi()
+    p = "vit-cnn"
 
-    for key, value in final_scores.items():
-        print(f"{key}: {value:.4f}")
-
+    main(binary, multi, p, data_dir)
 
 if __name__ == "__main__":
-    main()
-    main2()
+    main_cnn()
+    main_vit()
+    main_cnn_vit()
+    main_vit_cnn()

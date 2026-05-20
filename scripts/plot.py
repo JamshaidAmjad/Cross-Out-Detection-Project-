@@ -87,3 +87,5 @@ def main(p):
 if __name__ == "__main__":
     main("cnn")
     main("vit")
+    main("cnn-vit")
+    main("vit-cnn")
