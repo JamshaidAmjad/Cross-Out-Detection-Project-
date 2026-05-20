@@ -328,12 +328,17 @@ def aggregate_scores(results):
 
 
 def main(data_dir = "custom_dataset"):
-    binary = vit_binary()
-    multi = vit_multi()
+    # binary = vit_binary()
+    # multi = vit_multi()
+    # p = "vit"
+
+    binary = cnn_binary()
+    multi = cnn_multi()
+    p = "cnn"
 
     results = infer_scores(binary, multi, data_dir)
 
-    out_dir = "out"
+    out_dir = os.path.join("out", p)
 
     os.makedirs(out_dir, exist_ok=True)
 
